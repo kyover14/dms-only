@@ -340,10 +340,12 @@ not the app's `WKWebView`. Treat it as "unlikely to be engine-specific", not as
 - **Two selectors against the live Instagram DOM**: the `href` the Search entry
   uses, and the search results panel (see above). Everything else in
   `core/selectors.js` has been measured on the signed-in site.
-- **The Swift compiling at all.** Every line of it was written against the SDK
-  without a compiler to hand, so the first CI run is where that gets proved —
-  which is why the workflow now lints itself before the macOS runner is ever
-  billed for it.
+- **The Swift compiling at all** — this one is now proved rather than assumed.
+  The `v1.0.5` run compiled it, packaged a 101,369-byte unsigned `.ipa`, and
+  published it as a Release asset. That establishes three things: the Swift
+  compiles, the shared engine lands in the bundle root where `Bundle.main` looks
+  for it, and the executable is arm64. It establishes nothing about how the app
+  behaves once it is actually open.
 - **Anything on an actual iPhone.** No device access here, and no iOS Simulator
   without macOS. The last on-device run was 1.0.1, and nothing built since has
   been installed on a phone.
