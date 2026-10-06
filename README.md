@@ -87,7 +87,7 @@ docs/INSTALL-iOS.md      install walkthrough, on-device checklist, troubleshooti
 ## Quick start
 
 ```bash
-npm test              # everything below; ~15s, no network
+npm test              # everything below; ~6s, no network
 npm run test:webkit   # just the WebKit tests
 IGFOCUS_LIVE=1 npm test   # also loads the built extension into a real browser
                           # against real instagram.com — needs the network
