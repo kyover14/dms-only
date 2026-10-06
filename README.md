@@ -1,11 +1,18 @@
 # Instagram Focus
 
 An iOS app that loads Instagram with **only messages and the useful parts** —
-Messages, profiles, notifications and search work; the home feed, Reels and
-Explore do not exist.
+Messages, profiles and notifications work; the home feed, Reels, Explore and
+search do not exist.
 
 Not a blocker, and not an Instagram mod. It renders `instagram.com` in a
 `WKWebView` it controls, and filters what that web view is allowed to show.
+
+Every one of those is a switch in Settings, and each switch works both ways:
+turning a block off gives the surface back immediately, without reinstalling.
+Search is the one most likely to be switched back on — it is a one-tap discovery
+grid, so it is blocked by default, but the account rows it also serves are
+useful and are one toggle away. (People are always findable from the Messages
+screen's own recipient search, which is never touched.)
 
 ---
 
@@ -151,6 +158,28 @@ redirect was requested and only suppresses it if the page has not moved since �
 the precise "did the last redirect actually take effect?" question, and
 self-clearing once it does.
 
+And a fourth kind, which is about the settings rather than the filtering:
+
+> A hidden thing has to be *un*-hideable, or the toggle is a lie.
+
+Chrome was hidden once and never revisited, and `guard.css` hid it with
+unconditional rules — so switching "Hide Reels" off did nothing until the app was
+relaunched, because no script can undo a `display:none` rule. Worse, the same
+unrecoverable hiding existed in `core/rules.json`, which the user cannot override
+at all. Chrome hiding is now a pure function of the config: the engine works out
+what should be hidden right now, releases anything stamped persistent that is no
+longer in that list, and publishes the decision to the stylesheet through a
+`data-igfocus-hide` attribute that CSS keys off. The unrecoverable global rules
+were deleted rather than scoped. Both the WebKit suite and the fixture now assert
+that a toggle switched off actually gives the entry back — with no reload, since
+a reload would hide the bug.
+
+Found in the same pass, and much less visible: `Config.save()` rebuilt the config
+from defaults plus `localStorage`, silently dropping the override the iOS shell
+injects from `UserDefaults`. A single `setConfig()` call reset every setting the
+caller had not mentioned. It surfaced because it broke a test rather than a user,
+which is the point of having the test.
+
 ## Tuning against the live DOM
 
 `core/selectors.js` matches on `href` values and ARIA roles, never on
@@ -178,6 +207,18 @@ no-`<nav>`, div-and-anchor layout, including a decoy "Thread list"
 `[role="navigation"]` with no links — because the old fixture had a real `<nav>`,
 which is exactly why the tests passed while the device did not.
 
+Two things there are still guesswork, and are the first suspects if something
+misbehaves on the device:
+
+* **Which `href` the Search entry uses.** The live navigation showed exactly one
+  `/explore/` anchor and no `/explore/search/` one, so on that build the Explore
+  selector is the one doing the work. Both are listed, and the fixture models them
+  as two separate entries so either shape is covered.
+* **The search results grid selector** (`main[role="main"] div[role="tabpanel"]`).
+  `main[role="main"]` was confirmed to exist; the panel inside it was never
+  measured. It now only matters when search is switched back on, because with
+  search blocked the whole route never renders.
+
 The workflow, still with no iPhone required:
 
 1. `npm run build`
@@ -190,9 +231,12 @@ Reproduce anything surprising in `fixtures/instagram-mock.html` **first**, so th
 fix is covered by the self-test; then change the selectors. Add a line to
 `TUNING_LOG` in `core/selectors.js` saying what broke and what fixed it.
 
-Still unverified against the live site: the search results grid selector
-(`main[role="main"] div[role="tabpanel"]`). `main[role="main"]` was confirmed to
-exist, but the search panel itself has not been re-measured since.
+If a nav entry will not go away, look at `data-igfocus-hide` on `<html>` first.
+It is the single handover between the engine and the stylesheet: the engine writes
+`"reels explore search"` minus whatever you switched off, and every chrome rule in
+`guard.css` is scoped to it. An attribute that is right while the entry is still
+visible means the rule is wrong; an attribute that is missing means the engine did
+not recognise the entry at all, and the fix belongs in `SELECTORS`, not in the CSS.
 
 The same `core/` directory also builds a userscript (`dist/userscript/`) that
 works in Safari on iOS via the free [Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887)
@@ -206,6 +250,21 @@ Requires no Mac and no paid Apple account: GitHub Actions compiles on a macOS
 runner, and SideStore or AltStore installs and re-signs the unsigned `.ipa` with
 a free Apple ID.
 
+```bash
+git remote add origin https://github.com/<you>/<repo>.git
+git push -u origin main        # Actions builds the unsigned .ipa
+git tag v1.0.3 && git push origin v1.0.3   # attaches it to a permanent URL
+```
+
+Tagging is the step worth not skipping. A workflow artefact expires and needs you
+signed in to GitHub on the phone to download it; a Release asset gives the same
+file a stable, public URL that SideStore can be pointed at, so later versions
+install from inside the app instead of being copied across by hand:
+
+```
+https://github.com/<you>/<repo>/releases/latest/download/InstagramFocus-unsigned.ipa
+```
+
 No entitlements, no gated capabilities, no App Review approval — deliberately, so
 the cheap install path stays open. **Do not add `FamilyControls` or any other
 restricted entitlement** without revisiting that trade-off.
@@ -218,25 +277,38 @@ Full walkthrough: [`docs/INSTALL-iOS.md`](docs/INSTALL-iOS.md).
 
 **Verified now:**
 
-- 26 Node tests over route classification, config merging and the content rules
+- **37 Node tests** over route classification, config merging, the content
+  rules and the CI workflow
 - **4 WebKit tests**, the browser family iOS actually uses:
   - the shipped userscript artifact, injected into an engine-free page, hides the
-    Reels and Explore entries and refuses the feed
-  - the engine passes its own harness (19 assertions) and the SPA suite (4) under
-    WebKit, with no page errors
+    Reels, Explore and Search entries **and the rows they sit in** and refuses the
+    feed
+  - the engine passes its own harness (**35 assertions**) and the SPA suite (4)
+    under WebKit, with no page errors
   - **three real iPhone profiles** — iPhone 17 Pro Max, iPhone 17 and iPhone SE
     (3rd gen) — with mobile Safari user agents and 440/402/375pt viewports all
     reach the *identical* verdict, so the filtering is not viewport- or
     UA-dependent
   - WebKit and Chromium return **identical** results for the same input, so the
     behaviour is not engine-specific
-- 19 in-browser assertions over the fixture (`__igfocusSelfTest()`), including
-  the blank-Messages regression and the redirect path
+- **Search policy**, end to end: blocked by default, reported under its own rule,
+  handed back *whole* when switched off rather than falling through to Explore,
+  and — when allowed — keeping the account rows and tabs while losing the
+  endless grid
+- **Toggle reversibility**: switching a block off restores the surface with no
+  reload, in the engine, the stylesheet and the shipped artifact
+- **35 in-browser assertions** over the fixture (`__igfocusSelfTest()`), including
+  the blank-Messages regression, the search policy and the redirect path
 - 4 SPA assertions (`__igfocusSpaTest()`) covering the case where the history
   patch cannot work
 - Route detection **in isolation**: a blocked route reached with an unpatchable
   `pushState` and no DOM mutation is still caught, by the URL poll alone
-- `GeneratedRoutes.swift` is generated correctly from `core/routes.js`
+- `GeneratedRoutes.swift` is generated correctly from `core/routes.js`, and
+  `scripts/build.mjs` refuses to build if `package.json`, `core/guard.js` and
+  `ios/project.yml` disagree about the version
+- **The CI workflow itself**: no tabs or ragged indentation, every block scalar
+  correctly nested, `bash -n` clean over every `run:` line, every job with a
+  runner and steps, every `needs:` naming a real job, every action version-pinned
 - Build integrity: every core file is inlined into the fixture byte-for-byte
 - **On iOS Safari the engine loads, classifies and redirects correctly**
   (confirmed on a device, 1.0.1). Check yours with `IGFocus.status().version`.
@@ -250,13 +322,18 @@ not the app's `WKWebView`. Treat it as "unlikely to be engine-specific", not as
 
 **Not yet verified:**
 
-- **Selectors against the live Instagram DOM.** Still the biggest open item.
+- **Two selectors against the live Instagram DOM**: the `href` the Search entry
+  uses, and the search results panel (see above). Everything else in
+  `core/selectors.js` has been measured on the signed-in site.
+- **The Swift compiling at all.** Every line of it was written against the SDK
+  without a compiler to hand, so the first CI run is where that gets proved —
+  which is why the workflow now lints itself before the macOS runner is ever
+  billed for it.
 - **Anything on an actual iPhone.** No device access here, and no iOS Simulator
-  without macOS.
+  without macOS. The last on-device run was 1.0.1; 1.0.2 and 1.0.3 have not been
+  installed on a phone yet.
 - Instagram sign-in inside a `WKWebView`. Mitigated (Safari user agent,
   persistent data store, password login) but unproven until tried on a device.
-- The Xcode project builds — XcodeGen and `xcodebuild` only run on macOS, so CI
-  is where that gets proved.
 - SideStore refresh behaviour on current iOS.
 
 ---

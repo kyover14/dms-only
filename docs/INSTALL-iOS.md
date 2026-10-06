@@ -82,18 +82,51 @@ The rest of this document.
 
 ## 1. Get the `.ipa`
 
-1. Push this repository to GitHub (a private repo is fine — the free
-   `macos-latest` minutes cover this many times over).
-2. Open the **Actions** tab → the **iOS** workflow → the latest run.
-3. Download the **`InstagramFocus-unsigned-ipa`** artefact and unzip it. You get
-   `InstagramFocus-unsigned.ipa`.
+All of this is one-time. The repository has already been committed for you, so
+there is nothing to stage — you need a GitHub repository to push it to, and the
+commands below do the rest.
+
+1. Create an **empty** repository on GitHub (private is fine — the free
+   `macos-latest` minutes cover this many times over). Do not add a README,
+   licence or `.gitignore`; this checkout already has them.
+
+2. Push, replacing `<you>` and `<repo>`:
+
+   ```bash
+   git remote add origin https://github.com/<you>/<repo>.git
+   git push -u origin main
+   ```
+
+3. Watch it build: **Actions** tab → the **iOS** workflow. The `ios` job compiles
+   the app on a macOS runner and packages an unsigned `.ipa`.
+
+4. **Tag the version so the `.ipa` gets a permanent URL.** This is the step that
+   makes installing and *updating* pleasant, and it is the only difference
+   between the two ways of collecting the build:
+
+   ```bash
+   git tag v1.0.3
+   git push origin v1.0.3
+   ```
+
+   The `release` job then attaches the `.ipa` to a GitHub Release. Its URL looks
+   like:
+
+   ```
+   https://github.com/<you>/<repo>/releases/latest/download/InstagramFocus-unsigned.ipa
+   ```
+
+   That link never expires and works without being signed in to GitHub, so it can
+   be handed to SideStore directly — see step 3. Without the tag you can still
+   grab the file from the workflow run's **Artifacts** section, but artefacts
+   expire and need you signed in on the phone.
 
 It is unsigned on purpose: SideStore signs it on install with your own Apple ID,
 which means no certificates, no provisioning profiles, and no
 `$99`-a-year membership.
 
-> **First run only.** The very first `ios` job may take a few minutes longer
-> while Homebrew installs XcodeGen. If the build fails, the workflow prints the
+> **First run only.** The very first `ios` job takes a few minutes longer while
+> Homebrew installs XcodeGen. If the build fails, the workflow prints the
 > `xcodebuild` tail and a directory listing — paste that and it can be fixed
 > without a Mac.
 
@@ -125,10 +158,18 @@ troubles you, AltStore is the fallback.
 
 ## 3. Install the app
 
-1. Put `InstagramFocus-unsigned.ipa` somewhere the phone can reach — iCloud
-   Drive, AirDrop, or a file sharing app.
-2. In the store app on the phone, use **+ / Install** and pick the `.ipa`.
+1. Get the `.ipa` onto the phone. Either open the release URL from step 1.4 in
+   Safari (it downloads to **Files**), or AirDrop the file across.
+2. In the store app on the phone, use **+ / Install** and pick the `.ipa`. If
+   your SideStore build offers **Add Source**, the release URL works there too,
+   which means future versions install from inside the app.
 3. It appears on your home screen as **Focus**.
+
+**Updating later:** push the change, bump the version in `package.json` and
+`ios/project.yml` (the build fails if they disagree), then tag and push the new
+tag. The release URL stays the same, so refreshing in the store app picks up the
+new build. Reinstalling over the old one keeps you signed in, because the session
+lives in the app's persistent web data — deleting the app is what logs you out.
 
 Free-Apple-ID limits to expect: **3 sideloaded apps** at a time, and each
 certificate lasts **7 days**.
@@ -160,9 +201,15 @@ mitigated:
    URL and use this app read-only, keeping messaging in the real app.
 
 A useful trick: once signed in, the giveaway that the engine is alive is that no
-**Reels** or **Explore** entry appears in the navigation. If those are still
+**Reels**, **Explore** or **Search** entry appears in the navigation. If those are still
 there, the engine loaded but a selector missed — see
 [Tuning against the live DOM](../README.md#tuning-against-the-live-dom).
+
+**Want account search back?** Settings → **Hide search entirely** off. Search
+then opens with accounts and tabs intact and only the endless results grid
+removed; turn **Hide search results grid** off too and you get all of it. People
+can also be found from the Messages screen's own recipient search, which is never
+touched.
 
 ---
 
@@ -178,7 +225,8 @@ has moved — fix it in `core/selectors.js`, not in the Swift.
 | 2 | Look at the bottom/side nav | No **Reels** entry, no **Explore** entry |
 | 3 | Open a conversation and send a message | Works, keyboard fine |
 | 4 | Open your profile, then Tagged | Loads |
-| 5 | Search for an account | Account appears; the endless results grid does not |
+| 5 | Tap **Search** | You are bounced back to Messages — search is blocked like the feed |
+| 5b | Settings → **Hide search entirely** off | Search opens, accounts appear, the endless grid does not |
 | 6 | Type `instagram.com/reels/` in the address bar of a *new* Safari tab | Not applicable — check via a link from a profile instead: tapping a profile's **Reels** tab must not load it |
 | 7 | Tap the back button repeatedly from Messages | Never lands on the feed |
 | 8 | Kill and relaunch the app | Still signed in, still on Messages |
