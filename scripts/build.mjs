@@ -31,6 +31,9 @@ const VERSION = pkg.version;
 const DIST = join(ROOT, 'dist');
 const IOS_RESOURCES = join(ROOT, 'ios', 'FocusApp', 'Resources');
 
+/** Shallow, phone-findable copy of the userscript. Gitignored; see buildPhoneFolder(). */
+const PHONE_DIR = 'Put-On-Your-Phone';
+
 /** The load order is load-bearing: guard.js consumes the other three. */
 const CORE_SCRIPTS = ['config.js', 'routes.js', 'selectors.js', 'guard.js'];
 
@@ -141,6 +144,72 @@ function buildUserscript() {
   ).join('\n');
 
   write(join(DIST, 'userscript', 'instagram-focus.user.js'), header + cssBootstrap + body);
+}
+
+// ---------------------------------------------------------------------------
+// 1b. The copy you can reach from the phone
+// ---------------------------------------------------------------------------
+
+/**
+ * A duplicate of the userscript at the shallowest path we can put it on.
+ *
+ * Why this exists: the Safari route needs exactly one file on the phone and
+ * nothing else, and the transfer is the fiddliest part of it. The real artefact
+ * lives in dist/userscript/, which is correct for a build output and useless as
+ * something to find in a phone's file browser — dist/ reads as "build junk" and
+ * is buried among every other artefact.
+ *
+ * So the same file is also written one level below the project root, next to a
+ * note addressed to whoever is holding the phone, with a name that says what it
+ * is for. The transfer itself is then "attach this one file to an email to
+ * yourself", which is the shortest path that needs no account, no cable, no
+ * server and no cloud service in particular.
+ *
+ * Generated on every build, never edited, and gitignored, so it cannot drift
+ * from the real artefact or become a second thing to keep in step.
+ */
+function buildPhoneFolder() {
+  const dir = join(ROOT, PHONE_DIR);
+  fresh(dir);
+
+  const built = readFileSync(join(DIST, 'userscript', 'instagram-focus.user.js'), 'utf8');
+  write(join(dir, 'instagram-focus.user.js'), built);
+
+  write(
+    join(dir, 'READ-ME-FIRST.txt'),
+    [
+      'INSTAGRAM FOCUS - the one file your iPhone needs',
+      '=================================================',
+      '',
+      'You need exactly one file out of this folder:',
+      '',
+      '    instagram-focus.user.js',
+      '',
+      'On the phone:',
+      '',
+      '  1. Install "Userscripts" from the App Store. It is free.',
+      '  2. Open it and choose a folder for scripts - pick somewhere in',
+      '     iCloud Drive or "On My iPhone" so you can find it in Files.',
+      '  3. Get instagram-focus.user.js into that folder. It is one small text',
+      '     file, so send it to your phone however you like - email it to',
+      '     yourself as an attachment and tap Share > Save to Files on the phone.',
+      '     Then long-press the file in Files > Move > your script folder.',
+      '     (Fastest is email; messaging apps and any cloud app you already use',
+      '     work too. No cable needed.)',
+      '  4. Settings > Apps > Safari > Extensions > Userscripts > Allow, and set',
+      '     it to allow on instagram.com.',
+      '  5. Open instagram.com in Safari. No feed, no Reels, no Explore, no',
+      '     Search. Messages and profiles still work.',
+      '',
+      'To update it later, replace the file with a newer copy of the same name.',
+      '',
+      '-----------------------------------------------------------------------',
+      'This is the SAFARI route, not the Focus app. There is no icon on your',
+      'home screen and no app: it filters Instagram inside Safari.',
+      'Full notes, and the real app, are in docs/INSTALL-iOS.md.',
+      ''
+    ].join('\n')
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +361,7 @@ function main() {
   fresh(DIST);
 
   buildUserscript();
+  buildPhoneFolder();
   buildExtension(join(DIST, 'chrome'));
   buildExtension(join(DIST, 'safari'));
   buildFixture();
@@ -299,6 +369,7 @@ function main() {
 
   const outputs = [
     'dist/userscript/instagram-focus.user.js',
+    PHONE_DIR + '/ (the same file, shallow enough to find on a phone)',
     'dist/chrome/ (unpacked MV3 extension)',
     'dist/safari/ (unpacked MV3 extension)',
     'dist/instagram-mock.html (self-contained fixture)',

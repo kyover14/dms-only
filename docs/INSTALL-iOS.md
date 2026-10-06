@@ -256,14 +256,32 @@ If that is still useful:
    from the App Store — free and open source.
 2. Open the app, choose a folder for scripts, and pick somewhere in
    **iCloud Drive / Files** so you can drop files in from any device.
-3. Run `npm run build`, then copy **`dist/userscript/instagram-focus.user.js`**
-   into that folder.
+3. Run `npm run build`. That also writes
+   **`Put-On-Your-Phone/instagram-focus.user.js`** — the same file, copied to a
+   shallower path so it is easy to find.
+
+   **Sending that one file to your phone is the whole transfer.** It is a single
+   plain-text file; get it there however suits you and it will save into **Files**:
+
+   - **Email it to yourself** as an attachment, then open the message on the
+     phone and tap **Share → Save to Files**. The most reliable option.
+   - **Message it to yourself** (Messages, WhatsApp, Telegram, Signal) and use
+     **Share → Save to Files** on the message.
+   - **Any cloud or transfer app you already use** — whatever is synced on the
+     phone, or a USB cable with an app that exposes file sharing.
+
+   Once it is in Files, **long-press the `.user.js` → Move** into the script
+   folder from step 2, then confirm you can see it in the Userscripts app.
+
+   There is no install step and nothing to sign. Nothing on this route needs
+   Apple's permission, which is why it needs no cable and no account.
 4. **Settings → Apps → Safari → Extensions → Userscripts** → **Allow**, and set
    it to allow on `instagram.com`.
 5. Open `instagram.com` in Safari.
 
-**Updating it:** `npm run build` → replace the `.user.js` file → reopen Safari.
-The engine reloads with the page, so no reinstall is involved.
+**Updating it:** `npm run build` → send yourself the new `.user.js` (same name)
+→ replace the old one → reopen Safari. The engine reloads with the page, so no
+reinstall and no re-signing is involved.
 
 **Confirm which build you are running** — in Safari's web inspector, or by
 adding a temporary alert, read `IGFocus.status().version`. If it does not match

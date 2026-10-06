@@ -149,6 +149,12 @@ If there is no release there (because the tag in step 1.5 failed): go to
 the file inside is the `.ipa`. This works, but the download expires after 30 days
 and needs you signed in to GitHub, which is why the tag is worth getting right.
 
+> **You cannot install the app by sending the `.ipa` to your phone.** Unlike the
+> userscript, an `.ipa` is not something iOS opens — tapping it in Files offers
+> nothing, because the app is unsigned and iOS will only install signed apps. It
+> has to go through the store app from Part 3, which signs it on the way in. This
+> is the one place where Apple's rules cannot be worked around.
+
 **4.2** Install it:
 
 - **On the phone:** open the store app → **+** → choose the `.ipa` → install.
