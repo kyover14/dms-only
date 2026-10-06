@@ -1,0 +1,178 @@
+# Builds the iOS app and the shared core, entirely in CI.
+#
+# The point of this workflow is that you never need a Mac. macOS runners have
+# Xcode; the artefact is an UNSIGNED .ipa, which is exactly what AltStore,
+# SideStore and Sideloadly expect — they re-sign it on install with your own
+# Apple ID. An unsigned build also means no certificates or provisioning
+# profiles need to live in repository secrets.
+#
+# See docs/INSTALL-iOS.md for what to do with the artefact.
+
+name: iOS
+
+on:
+  push:
+    branches: [main]
+    # Pushing a tag is what turns a build into something installable from a URL
+    # you can keep. See the `release` job at the bottom.
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  core:
+    name: Core engine (tests + browser bundles)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build shared core
+        run: npm run build
+
+      # The userscript and the unpacked extension folders are useful artefacts
+      # in their own right: they are how selectors get tuned against the live
+      # DOM on a desktop before anything touches a device.
+      - name: Upload browser builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: instagram-focus-web
+          path: |
+            dist/userscript
+            dist/chrome
+            dist/safari
+            dist/instagram-mock.html
+          if-no-files-found: error
+
+  webkit:
+    # Deliberately NOT a dependency of the iOS job. This one downloads browser
+    # binaries, so it is the most likely thing in the workflow to flake — and a
+    # flake here must never block a build you actually need.
+    name: WebKit engine check
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      # WebKit is the engine iOS Safari and WKWebView both use, so this is the
+      # closest thing to the real target that can run off-device.
+      - name: Install WebKit
+        run: npx playwright install --with-deps webkit
+
+      - name: Run WebKit tests
+        run: npm run test:webkit
+
+  ios:
+    name: iOS app (unsigned .ipa)
+    runs-on: macos-latest
+    needs: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Must run before xcodegen: this writes ios/FocusApp/GeneratedRoutes.swift
+      # and copies the shared engine into ios/FocusApp/Resources/.
+      - name: Build shared core into iOS resources
+        run: npm run build
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      # `-target` rather than `-scheme`: it needs no shared scheme to exist, and
+      # there are no tests to run in this target.
+      - name: Build unsigned app
+        run: |
+          # -o pipefail matters: without it the `tail` below would swallow a
+          # build failure, the step would report success, and the packaging step
+          # would fail afterwards with a confusing "no .app produced" message.
+          set -o pipefail
+          xcodebuild build \
+            -project ios/InstagramFocus.xcodeproj \
+            -target InstagramFocus \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CONFIGURATION_BUILD_DIR="$PWD/build/Products" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO 2>&1 | tail -60
+
+      - name: Package unsigned .ipa
+        run: |
+          set -euo pipefail
+          # CONFIGURATION_BUILD_DIR above makes this location deterministic, but
+          # search the usual DerivedData place too rather than trusting one path.
+          APP_PATH=$(find build -name 'InstagramFocus.app' -type d 2>/dev/null | head -1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name 'InstagramFocus.app' -type d 2>/dev/null | head -1)
+          fi
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::No .app produced — scroll up to the xcodebuild output for the real error."
+            find build -maxdepth 5 -type d | head -60
+            exit 1
+          fi
+          echo "Packaging $APP_PATH"
+          rm -rf build/Payload
+          mkdir -p build/Payload
+          cp -R "$APP_PATH" build/Payload/
+          (cd build && zip -qry InstagramFocus-unsigned.ipa Payload)
+          ls -la build/InstagramFocus-unsigned.ipa
+
+      - name: Upload .ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: InstagramFocus-unsigned-ipa
+          path: build/InstagramFocus-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    # An Actions artefact expires and needs you to be signed in to download it.
+    # A Release asset gives the same .ipa a permanent, public-direct download URL
+    # that SideStore can point at — which is the difference between "install it
+    # again on the phone every time" and "tap update".
+    #
+    # Only ever runs for a tag, so it cannot break an ordinary build.
+    name: Attach the .ipa to a Release
+    runs-on: ubuntu-latest
+    needs: ios
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Fetch the built .ipa
+        uses: actions/download-artifact@v4
+        with:
+          name: InstagramFocus-unsigned-ipa
+
+      # `gh` is preinstalled on runners, so this needs no third-party action.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ls -la
+          gh release create "$GITHUB_REF_NAME" InstagramFocus-unsigned.ipa \
+            --title "Instagram Focus $GITHUB_REF_NAME" \
+            --notes "Unsigned build. SideStore or AltStore re-signs it with your own Apple ID on install. See docs/INSTALL-iOS.md." || {
+              echo "release already exists; uploading the asset instead"
+              gh release upload "$GITHUB_REF_NAME" InstagramFocus-unsigned.ipa --clobber
+            }

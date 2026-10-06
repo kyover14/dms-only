@@ -1,0 +1,22 @@
+{
+  "name": "instagram-focus",
+  "version": "1.0.3",
+  "private": true,
+  "description": "An iOS app that loads Instagram with only messages and the useful parts — no home feed, no Reels, no Explore.",
+  "scripts": {
+    "test": "node --test",
+    "test:webkit": "node --test tests/webkit.test.mjs",
+    "build": "node scripts/build.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  },
+  "comments": {
+    "playwright": "Optional. The only shipped dependency, and only for tests: it runs the engine under WebKit, which is the browser family iOS actually uses. Without it `npm test` skips the WebKit tests rather than failing. Install with: npm i -D playwright && npx playwright install webkit"
+  }
+}

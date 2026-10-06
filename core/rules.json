@@ -1,0 +1,65 @@
+[
+  {
+    "trigger": {
+      "url-filter": "^https?://(?:[^/]+\\.)?instagram\\.com/(?:[?#].*)?$"
+    },
+    "action": {
+      "type": "css-display-none",
+      "selector": "main[role=\"main\"]"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": "^https?://(?:[^/]+\\.)?instagram\\.com/reels?(?:[/?#].*)?$"
+    },
+    "action": {
+      "type": "css-display-none",
+      "selector": "main[role=\"main\"]"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": "^https?://(?:[^/]+\\.)?instagram\\.com/explore/?(?:[?#].*)?$"
+    },
+    "action": {
+      "type": "css-display-none",
+      "selector": "main[role=\"main\"]"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": "^https?://(?:[^/]+\\.)?instagram\\.com/explore/tags(?:[/?#].*)?$"
+    },
+    "action": {
+      "type": "css-display-none",
+      "selector": "main[role=\"main\"]"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": "^https?://(?:[^/]+\\.)?instagram\\.com/explore/locations(?:[/?#].*)?$"
+    },
+    "action": {
+      "type": "css-display-none",
+      "selector": "main[role=\"main\"]"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": "^https?://(?:[^/]+\\.)?instagram\\.com/explore/people(?:[/?#].*)?$"
+    },
+    "action": {
+      "type": "css-display-none",
+      "selector": "main[role=\"main\"]"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": "^https?://(?:[^/]+\\.)?instagram\\.com/[^/]+/reels(?:[/?#].*)?$"
+    },
+    "action": {
+      "type": "css-display-none",
+      "selector": "main[role=\"main\"]"
+    }
+  }
+]

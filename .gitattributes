@@ -1,0 +1,18 @@
+# One checkout, three operating systems.
+#
+# The engine is developed on Windows and compiled on macOS CI, and
+# scripts/build.mjs verifies that every core file is inlined into the fixture
+# byte-for-byte. Nothing here breaks on CRLF today — the comparison happens
+# in memory, on data read from a single disk — but a line ending that differs
+# between two machines is exactly the kind of thing that turns into a mystery
+# failure in the one place it cannot be debugged, which is CI. So pin it.
+#
+# `text=auto` lets git decide what is text; `eol=lf` stores and checks out LF
+# for everything it decides is text, which is what every tool here expects.
+* text=auto eol=lf
+
+# Binary or generated content: leave completely alone.
+*.png binary
+*.jpg binary
+*.ipa binary
+*.xcuserstate binary

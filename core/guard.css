@@ -1,0 +1,125 @@
+/*
+ * Instagram Focus — static hide rules.
+ *
+ * Injected at `documentStart`, before Instagram's own scripts run, so these are
+ * the rules that prevent a frame of feed from ever appearing. They must stand
+ * on their own without JavaScript.
+ *
+ * The URL-scoped equivalent lives in `core/rules.json` (compiled to a
+ * WKContentRuleList on iOS, and to declarativeNetRequest rules in a browser
+ * extension). Those rules can be scoped to a URL, which plain CSS cannot — that
+ * is how `main[role="main"]` gets hidden on `/` without also hiding your
+ * messages on `/direct/inbox/`.
+ */
+
+/* ---------------------------------------------------------------------------
+ * 1. Chrome removal. Route-independent: the Reels, Explore and Search entries
+ *    are never wanted, on any page.
+ *
+ *    Scoped by `data-igfocus-hide`, which guard.js writes on <html> from the
+ *    live config (`"reels explore search"`, minus whatever you switch off).
+ *    Nothing is hidden here without that attribute.
+ *
+ *    That indirection is the point: an unconditional stylesheet rule is
+ *    one-way. Switching "Hide Reels" off in Settings could never bring the nav
+ *    entry back, because no amount of JavaScript can undo a `display:none` rule
+ *    — the old version of this file had exactly that bug. The attribute is
+ *    written before Instagram's own scripts run, so keying off it costs no
+ *    extra flash.
+ *
+ *    CSS alone can also only reach the <a>. That is not enough on the real
+ *    site: the nav row is a plain <div> holding the icon as well, so hiding
+ *    just the label leaves an icon and a tappable row behind. guard.js fixes
+ *    that at runtime by climbing from the anchor to its row and stamping
+ *    data-igfocus-hidden on both (see navRowFor()). These rules remain as the
+ *    pre-JS backstop and to keep the label from flashing.
+ * ------------------------------------------------------------------------ */
+html[data-igfocus-hide~="reels"] a[href="/reels/"],
+html[data-igfocus-hide~="reels"] a[href="/reels"],
+html[data-igfocus-hide~="reels"] nav a[href^="/reels/"],
+html[data-igfocus-hide~="reels"] [role="navigation"] a[href^="/reels/"],
+html[data-igfocus-hide~="explore"] a[href="/explore/"],
+html[data-igfocus-hide~="explore"] a[href="/explore"],
+html[data-igfocus-hide~="explore"] nav a[href^="/explore/"],
+html[data-igfocus-hide~="explore"] [role="navigation"] a[href^="/explore/"],
+html[data-igfocus-hide~="search"] a[href^="/explore/search"] {
+  display: none !important;
+}
+
+/*
+ * Anything the engine decided to hide (guard.js stamps this attribute).
+ * The value distinguishes the two kinds of hiding — "1" for chrome that is
+ * never wanted, "route" for hiding that is recomputed on every route change —
+ * but both render the same way.
+ */
+[data-igfocus-hidden] {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * 2. Route-scoped backstops. guard.js sets these on <html> as its very first
+ *    act, so they apply within a frame of the page becoming interactive. They
+ *    matter when redirection is switched off, or when iOS cancelled the
+ *    navigation and we are rendering a blocked page in place.
+ * ------------------------------------------------------------------------ */
+html[data-igfocus-route="home"] main[role="main"],
+html[data-igfocus-route="reels"] main[role="main"],
+html[data-igfocus-route="explore"] main[role="main"],
+html[data-igfocus-route="profile-reels"] main[role="main"] {
+  display: none !important;
+}
+
+/* Never let the feed scroll region occupy height while it is being emptied. */
+html[data-igfocus-route="home"] main[role="main"],
+html[data-igfocus-route="reels"] main[role="main"] {
+  min-height: 0 !important;
+}
+
+/* The standalone reel shortcode page and the Reels tab, when reached directly. */
+html[data-igfocus-route="reels"] video,
+html[data-igfocus-route="home"] video {
+  visibility: hidden !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * 2b. Search. Only reachable while `blockSearch` is off — with it on, the whole
+ *     route is redirected before this matters. When search IS allowed, accounts,
+ *     hashtags and people are all legitimate, but the scrollable results grid is
+ *     not. The tabs and the account rows are deliberately left alone so search
+ *     still works, and `[role="group"]` marks BOTH, which is why it is not
+ *     listed here.
+ *
+ *     `data-igfocus-route="search"` is only written while `blockSearchGrid` is
+ *     on (see surfaceFor in guard.js), so these rules follow the setting too.
+ * ------------------------------------------------------------------------ */
+html[data-igfocus-route="search"] main[role="main"] div[role="tabpanel"] {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. The in-place notice, shown only when `enforceRedirect` is off. Styled to
+ *    read as a normal, calm Instagram surface rather than a broken page.
+ * ------------------------------------------------------------------------ */
+.igfocus-notice {
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 24px 20px;
+  max-width: 420px;
+  font: 400 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--ig-primary-text, #262626);
+  background: var(--ig-elevated-background, #ffffff);
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.igfocus-notice h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.igfocus-notice p {
+  margin: 0;
+  opacity: 0.7;
+}

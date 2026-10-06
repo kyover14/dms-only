@@ -1,0 +1,253 @@
+# Getting it onto your iPhone
+
+No Mac required. Two things do the work: **GitHub Actions** compiles the app on a
+macOS runner, and **SideStore** (or AltStore) installs and re-signs it from your
+Windows PC using a free Apple ID.
+
+Read [What this cannot do](#what-this-cannot-do) before you start. It is short
+and it matters.
+
+---
+
+## What you are installing
+
+An app with one job: it renders `instagram.com` in a web view with the home
+feed, Reels and Explore removed, and Messages, profiles, notifications and
+search left working.
+
+It is **not** a blocker. It is a different front door to Instagram. The real
+Instagram app stays installed — keep it, so you still get push notifications for
+messages — and a Shortcut (step 6) sends you into this app whenever you tap it.
+
+---
+
+## What this cannot do
+
+**iOS gives no app any way to modify another app.** Not yours, not Meta's, not
+the ones on the App Store that claim to. There is no equivalent of Android's
+accessibility services, and the Screen Time API (`FamilyControls`) can only block
+*whole* apps and websites — blocking Instagram that way takes your messages down
+with it.
+
+So this works for Instagram **in this app**, not in the Instagram app. That is
+the whole reason this project exists in this shape.
+
+Two consequences worth accepting up front:
+
+- **No push notifications from inside this app.** Messages will not buzz unless
+  the real Instagram app is also installed and logged in.
+- **Some Instagram features need the real app** — posting stories from the
+  camera, for instance. Use the real app for those; come back here to read and
+  reply.
+
+---
+
+## Option B — Safari on your iPhone, no build and no PC
+
+Fastest path to something working, and the one to use while tuning: the same
+engine as a **userscript** in Safari. No GitHub, no CI, no sideloading, no Apple
+ID.
+
+1. Install [Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887)
+   from the App Store — free and open source.
+2. Open the app, choose a folder for scripts, and pick somewhere in
+   **iCloud Drive / Files** so you can drop files in from any device.
+3. Run `npm run build`, then copy **`dist/userscript/instagram-focus.user.js`**
+   into that folder.
+4. **Settings → Apps → Safari → Extensions → Userscripts** → **Allow**, and set
+   it to allow on `instagram.com`.
+5. Open `instagram.com` in Safari.
+
+**Updating it:** `npm run build` → replace the `.user.js` file → reopen Safari.
+The engine reloads with the page, so no reinstall is involved.
+
+**Confirm which build you are running** — in Safari's web inspector, or by
+adding a temporary alert, read `IGFocus.status().version`. If it does not match
+`package.json`, the old file is still in place and Safari is serving a cache.
+
+Caveats specific to this route:
+
+- **Safari only.** Not the Instagram app, and **not** a Home Screen web app —
+iOS does not run extensions inside those.
+- Because a userscript manager may inject into an **isolated world**, the history
+  patch can silently do nothing. That is why route detection polls the URL as
+  well; it is what makes this path work at all.
+- Notifications still come from the real Instagram app. Keep it installed.
+
+---
+
+## Option A — the standalone app
+
+The rest of this document.
+
+## 1. Get the `.ipa`
+
+1. Push this repository to GitHub (a private repo is fine — the free
+   `macos-latest` minutes cover this many times over).
+2. Open the **Actions** tab → the **iOS** workflow → the latest run.
+3. Download the **`InstagramFocus-unsigned-ipa`** artefact and unzip it. You get
+   `InstagramFocus-unsigned.ipa`.
+
+It is unsigned on purpose: SideStore signs it on install with your own Apple ID,
+which means no certificates, no provisioning profiles, and no
+`$99`-a-year membership.
+
+> **First run only.** The very first `ios` job may take a few minutes longer
+> while Homebrew installs XcodeGen. If the build fails, the workflow prints the
+> `xcodebuild` tail and a directory listing — paste that and it can be fixed
+> without a Mac.
+
+---
+
+## 2. Set up SideStore or AltStore on Windows
+
+Both are the same idea: a desktop component pairs with your phone once, then the
+phone side re-signs apps on its own.
+
+1. Install **iTunes** and **iCloud** from Apple's own website — *not* the
+   Microsoft Store versions, which omit the device drivers these tools need.
+2. Install [AltServer](https://altstore.io/) (Windows build), or set up
+   [SideStore](https://sidestore.io/).
+3. Connect your iPhone by USB, unlock it, and tap **Trust**.
+4. Install the store app onto your phone from the desktop component, then enable
+   **Developer Mode** on the phone: **Settings → Privacy & Security → Developer
+   Mode** → on → restart.
+5. On the phone, open the store app and sign in with your Apple ID. A free
+   Apple ID works. Use an **app-specific password** if the tool offers it — never
+   your main password.
+
+**SideStore vs AltStore:** SideStore refreshes the 7-day certificate on-device
+over a local VPN, so you do not need the PC every week. AltStore needs the
+desktop component running on the same network to refresh. If SideStore's refresh
+troubles you, AltStore is the fallback.
+
+---
+
+## 3. Install the app
+
+1. Put `InstagramFocus-unsigned.ipa` somewhere the phone can reach — iCloud
+   Drive, AirDrop, or a file sharing app.
+2. In the store app on the phone, use **+ / Install** and pick the `.ipa`.
+3. It appears on your home screen as **Focus**.
+
+Free-Apple-ID limits to expect: **3 sideloaded apps** at a time, and each
+certificate lasts **7 days**.
+
+---
+
+## 4. First run, and signing in
+
+Open **Focus**. It loads `instagram.com/direct/inbox/` and, because the default
+data store is persistent, you only sign in once.
+
+Sign-in is the one part of this project that is not fully in our control —
+Instagram sometimes treats embedded browsers as suspicious. How this was
+mitigated:
+
+- a full mobile Safari user agent (`Version/18.0 Mobile/15E148 Safari/604.1`)
+- a persistent `WKWebsiteDataStore`, so the session survives relaunch
+- password login rather than a third-party SSO button, which is far more likely
+  to work in a web view
+
+**If sign-in fails or loops**, in order of how likely it is to help:
+
+1. **Sign in to the real Instagram app first.** Instagram links the session to
+   the account, not the client, and a warmed-up account is treated better.
+2. Try **Continue with Facebook/Google** in the web view if password login is
+   refused — sometimes the reverse is true.
+3. Clear the app's data (delete and reinstall) and try again on a fresh session.
+4. As a last resort, set **Settings → Behaviour → Landing path** to a profile
+   URL and use this app read-only, keeping messaging in the real app.
+
+A useful trick: once signed in, the giveaway that the engine is alive is that no
+**Reels** or **Explore** entry appears in the navigation. If those are still
+there, the engine loaded but a selector missed — see
+[Tuning against the live DOM](../README.md#tuning-against-the-live-dom).
+
+---
+
+## 5. Verify it actually works
+
+Run through this once, on the device, after signing in. Each item maps to
+something the offline tests cover, so a failure here means the real Instagram DOM
+has moved — fix it in `core/selectors.js`, not in the Swift.
+
+| # | Do this | Expect |
+|---|---|---|
+| 1 | Open Focus | Lands on Messages, no feed flash |
+| 2 | Look at the bottom/side nav | No **Reels** entry, no **Explore** entry |
+| 3 | Open a conversation and send a message | Works, keyboard fine |
+| 4 | Open your profile, then Tagged | Loads |
+| 5 | Search for an account | Account appears; the endless results grid does not |
+| 6 | Type `instagram.com/reels/` in the address bar of a *new* Safari tab | Not applicable — check via a link from a profile instead: tapping a profile's **Reels** tab must not load it |
+| 7 | Tap the back button repeatedly from Messages | Never lands on the feed |
+| 8 | Kill and relaunch the app | Still signed in, still on Messages |
+| 9 | Real Instagram app still installed | Messages still notify you |
+
+Items 6 and 7 are the ones that catch a half-working install: they are the paths
+that silently reach the feed if only the CSS layer is doing its job.
+
+---
+
+## 6. Bounce the Instagram app into Focus (optional, recommended)
+
+This is what keeps the habit from leaking back. Keep the real Instagram app for
+notifications, and let a Shortcut move you out of it the moment you open it.
+
+1. **Shortcuts** app → **Automation** → **+** → **App**.
+2. Choose **Instagram**, tick **Is Opened**, and set it to **Run Immediately**
+   (turn off "Ask Before Running").
+3. Action: **Open App** → **Focus**.
+4. Done.
+
+Now tapping the Instagram icon opens Focus instead. Notifications still arrive
+from the real app; if you deliberately want the real app, open it from the App
+Library and dismiss the automation.
+
+---
+
+## 7. Keeping it alive
+
+Free Apple IDs last **7 days**. SideStore refreshes on-device automatically over
+a local VPN; AltStore needs the desktop component reachable. If the app stops
+launching, it has simply expired — open the store app and refresh.
+
+To remove the upkeep entirely: join the Apple Developer Program ($99/yr) and
+distribute through **TestFlight**, which lasts a year per build. Change nothing
+else — the same unsigned artifact can be re-signed for TestFlight, and this app
+needs no entitlements or App Review approvals because it uses no gated APIs.
+
+---
+
+## Troubleshooting
+
+**App installs but immediately closes.**
+The certificate expired, or Developer Mode is off. Refresh in the store app;
+re-enable Developer Mode in Settings → Privacy & Security.
+
+**Messages list is blank, or the whole page is blank.**
+This is the failure mode the engine is most careful about, and it has its own
+regression guard in `fixtures/instagram-mock.html` (`__igfocusSelfTest()`). It
+almost always means a selector in `core/selectors.js` is matching something on
+the Messages page. Narrow that selector, rebuild, reinstall.
+
+**Feed flashes for a moment before the redirect.**
+`rules.json` probably failed to compile. The JS and delegate layers still work,
+which is why this is cosmetic rather than fatal; check the device console for a
+`rule list failed to compile` line.
+
+**Reels still reachable from a profile or a DM share.**
+DM shares are intentional — you asked for messages to keep working, so video
+inside a conversation is allowed. Profile tabs are not: check that
+**Settings → What to hide → Hide Reels** is on.
+
+**Everything worked, then a week later nothing blocks.**
+Instagram shipped a markup change and a selector rotted. See
+[`README.md` → Tuning against the live DOM](../README.md#tuning-against-the-live-dom).
+
+**Messages opens, but the feed comes back when I tap Home.**
+That was a real bug, fixed in **1.0.1**: the script could not see in-app route
+changes made through a `pushState` it had not managed to patch, and it only ever
+redirected rather than also hiding. Confirm you are running the fix by checking
+`IGFocus.status().version`, and make sure the updated file actually got onto the
+device.

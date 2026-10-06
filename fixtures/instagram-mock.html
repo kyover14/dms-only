@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instagram Focus — offline fixture</title>
+
+<!--
+  OFFLINE FIXTURE. This is NOT Instagram. It is a hand-built stand-in for
+  Instagram's markup so the filtering engine can be developed and verified from
+  Windows, with no simulator, no device and no network.
+
+  It reproduces the parts of the real DOM that the selector map depends on:
+    * the nav as the REAL SITE builds it — no <nav> element anywhere, entries
+      are bare <a href="…"> inside a chain of <div>s, rendered as both a
+      bottom tab bar (mobile) and a sidebar (desktop)
+    * a decoy [role="navigation"] panel (the DM "Thread list") that holds no
+      links at all — the live site's only [role="navigation"] looks like this
+    * main[role="main"] holding posts (home) or lists (messages)
+    * a full-screen Reels viewer inside div[role="dialog"]
+    * a "Suggested Reels" section labelled by a heading
+    * a search results surface with a [role="tabpanel"] grid
+    * autoplaying <video> elements
+  When real Instagram changes, reproduce the new markup HERE first, fix
+  core/selectors.js against it, and only then go look at the live site.
+
+  The core scripts load in <head>, without `defer`, to emulate the
+  documentStart injection the iOS shell uses — that is what proves the
+  no-flash-of-feed behaviour is real.
+-->
+
+<script>
+  // Redirect seam. guard.js calls this instead of location.replace so the
+  // fixture can demonstrate redirects without navigating away from itself.
+  // It has to exist before guard.js loads.
+  window.__redirectRequests = [];
+  window.IGFocusNavigate = function (to) {
+    window.__redirectRequests.push(to);
+  };
+
+  // Captured BEFORE guard.js patches history, so tests can navigate the way an
+  // app does when our patch is a no-op — which is what happens in an isolated
+  // world (Safari web extension, userscript manager). This is the blind spot
+  // that let a real bug reach a device: in the page world the patch works, so
+  // the fixture could never reproduce the failure until it did this.
+  window.__rawPushState = window.history.pushState.bind(window.history);
+</script>
+
+<script src="../core/config.js"></script>
+<script src="../core/routes.js"></script>
+<script src="../core/selectors.js"></script>
+<link rel="stylesheet" href="../core/guard.css">
+<script src="../core/guard.js"></script>
+
+<style>
+  :root {
+    --line: #dbdbdb;
+    --muted: #737373;
+    --accent: #0095f6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 400 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #262626;
+    background: #fafafa;
+  }
+  .banner {
+    padding: 8px 12px;
+    background: #fff4d6;
+    border-bottom: 1px solid #e8d9a8;
+    font-size: 12px;
+  }
+  .layout { display: flex; gap: 0; align-items: stretch; min-height: calc(100vh - 34px); }
+  .sidebar {
+    width: 200px;
+    flex: 0 0 200px;
+    border-right: 1px solid var(--line);
+    background: #fff;
+    padding: 12px 0;
+  }
+  .navrow { display: flex; align-items: center; }
+  .navcell { display: flex; align-items: center; }
+  .threadpanel {
+    margin: 10px 14px 0;
+    padding: 8px 10px;
+    border: 1px dashed #c9c9c9;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+    color: #262626;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .sidebar a:hover { background: #f2f2f2; }
+  .glyph { width: 18px; text-align: center; }
+  .stage { flex: 1 1 auto; min-width: 0; }
+  .phone {
+    max-width: 420px;
+    margin: 16px auto;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    font-weight: 600;
+  }
+  .topbar .route { font-weight: 400; color: var(--muted); font-size: 12px; }
+  .bottomnav {
+    display: flex;
+    justify-content: space-around;
+    border-top: 1px solid var(--line);
+    padding: 10px 0;
+    background: #fff;
+  }
+  .bottomnav a { color: #262626; text-decoration: none; font-size: 11px; text-align: center; }
+  .bottomnav .glyph { display: block; font-size: 18px; margin-bottom: 2px; }
+  article { padding: 12px 14px; border-bottom: 1px solid #efefef; }
+  article header { font-weight: 600; margin-bottom: 8px; }
+  .photo {
+    height: 150px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #e3e3e3, #cbcfd4);
+  }
+  section.suggested { padding: 12px 14px; border-bottom: 1px solid #efefef; }
+  section.suggested h2 { margin: 0 0 8px; font-size: 14px; }
+  .rail { display: flex; gap: 8px; }
+  .rail .tile { flex: 1; height: 80px; border-radius: 6px; background: #dfe4ea; }
+  .dialog {
+    margin: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    background: #111;
+    color: #fff;
+  }
+  .dialog video { width: 100%; height: 190px; background: #333; display: block; }
+  .dmrow { display: flex; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #f0f0f0; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: #d7dbe0; flex: 0 0 40px; }
+  .dmrow form { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+  .dmrow input { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
+  .tabs { display: flex; gap: 14px; padding: 12px 14px 0; font-weight: 600; }
+  .tabs .tab { padding-bottom: 8px; color: var(--muted); }
+  .tabs .tab.active { color: #262626; border-bottom: 2px solid #262626; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 12px 14px; }
+  .grid div { aspect-ratio: 1; background: #dfe4ea; border-radius: 3px; }
+  .grid .reel { background: #cbbfe0; }
+  .acct { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; }
+  .panel {
+    max-width: 420px;
+    margin: 16px auto 40px;
+    padding: 14px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .panel h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  button {
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  button:hover { border-color: #999; }
+  button.primary { border-color: var(--accent); color: var(--accent); }
+  label.toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; width: 48%; }
+  pre#status, pre#log {
+    margin: 0;
+    padding: 10px;
+    background: #f6f8fa;
+    border: 1px solid #e6e9ec;
+    border-radius: 6px;
+    font: 400 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: pre-wrap;
+    max-height: 190px;
+    overflow: auto;
+  }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <strong>Offline fixture</strong> — a stand-in for Instagram's markup, not the real site. The engine,
+  selectors and CSS here are the exact files that ship in the iOS app.
+</div>
+
+<div class="layout">
+  <div class="sidebar" id="sidebar"></div>
+
+  <div class="stage">
+    <div class="phone">
+      <div class="topbar">
+        <span>Instagram</span>
+        <span class="route" id="routeLabel">/</span>
+      </div>
+      <main role="main" id="surface"></main>
+      <div class="bottomnav" id="bottomnav"></div>
+    </div>
+
+    <div class="threadpanel" id="threadpanel" role="navigation" aria-label="Thread list">
+      decoy: the real site's only [role="navigation"] is this DM panel, and it has no links
+    </div>
+
+    <div class="panel">
+      <h3>Navigate</h3>
+      <div class="row" id="navButtons"></div>
+
+      <h3>Toggles</h3>
+      <div class="row" id="toggles"></div>
+
+      <h3>Engine status</h3>
+      <pre id="status">boot…</pre>
+
+      <h3>Decision log &amp; redirect requests</h3>
+      <pre id="log"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // --- tiny SPA router ------------------------------------------------------
+  // Real Instagram calls history.pushState instead of loading a document. That
+  // is exactly what the engine has to survive, so the fixture does the same.
+
+  var ROUTES = {
+    home:       { path: '/',                            label: 'Home' },
+    reels:      { path: '/reels/',                      label: 'Reels' },
+    reel:       { path: '/reel/Cx1a2Bc3DeF/',           label: 'Single Reel' },
+    explore:    { path: '/explore/',                    label: 'Explore' },
+    tags:       { path: '/explore/tags/cats/',          label: 'Explore tag' },
+    search:     { path: '/explore/search/keyword/?q=cats', label: 'Search' },
+    inbox:      { path: '/direct/inbox/',               label: 'Messages' },
+    thread:     { path: '/direct/t/3402823668/',        label: 'Thread' },
+    profile:    { path: '/someuser/',                   label: 'Profile' },
+    profileReels: { path: '/someuser/reels/',           label: 'Profile Reels' },
+    post:       { path: '/p/Cx1a2Bc3DeF/',              label: 'Post' },
+    notifications: { path: '/notifications/',           label: 'Notifications' },
+    login:      { path: '/accounts/login/',             label: 'Login' },
+    nametag:    { path: '/nametag/',                    label: 'Nametag' }
+  };
+
+  var NAV = [
+    { key: 'home',  href: '/',                glyph: '⌂', text: 'Home' },
+    { key: 'reels', href: '/reels/',          glyph: '▶', text: 'Reels' },
+    { key: 'explore', href: '/explore/',      glyph: '⌕', text: 'Explore' },
+    // Which href the real Search entry uses is not measured yet: the live nav
+    // showed exactly one /explore/ anchor and no /explore/search/ one. It is
+    // modelled separately here anyway, so that whichever Instagram ships is
+    // covered — the selectors list both, and a duplicate costs nothing.
+    { key: 'search', href: '/explore/search/', glyph: '⌕', text: 'Search' },
+    { key: 'inbox', href: '/direct/inbox/',   glyph: '✉', text: 'Messages' },
+    { key: 'profile', href: '/someuser/',     glyph: '☺', text: 'Profile' }
+  ];
+
+  var logLines = [];
+
+  function log(line) {
+    logLines.push(new Date().toISOString().slice(11, 19) + '  ' + line);
+    if (logLines.length > 60) logLines.shift();
+    var el = document.getElementById('log');
+    if (el) el.textContent = logLines.join('\n');
+  }
+
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      if (k === 'text') node.textContent = attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { node.appendChild(c); });
+    return node;
+  }
+
+  /**
+   * One nav row, built the way the REAL site builds it: a bare <div> owning the
+   * icon and the label anchor, with no <nav> and no [role="navigation"]
+   * anywhere near it. The anchor is tucked inside a single-child <span> so the
+   * engine has to climb to find the row — the exact shape that broke us on the
+   * device, where hiding the anchor alone left a 48px tappable row on screen.
+   *
+   * data-nav lets the self-test assert the WHOLE row disappeared, not just the
+   * anchor.
+   */
+  function navRow(item, withLabel) {
+    var a = el('a', { href: item.href });
+    a.appendChild(el('span', { class: 'glyph', text: item.glyph }));
+    if (withLabel) a.appendChild(el('span', { text: item.text }));
+    a.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      goTo(item.href);
+      window.__drainRedirects();
+    });
+    var cell = el('span', { class: 'navcell' }, [a]);
+    return el('div', { class: 'navrow', 'data-nav': item.key }, [cell]);
+  }
+
+  function navRows(withLabel) {
+    return NAV.map(function (item) { return navRow(item, withLabel); });
+  }
+
+  // --- surfaces -------------------------------------------------------------
+
+  var BOT = '/direct/inbox/';
+
+  function renderHome() {
+    var frag = document.createDocumentFragment();
+    for (var i = 1; i <= 3; i++) {
+      frag.appendChild(el('article', {}, [
+        el('header', { text: 'someuser' + i }),
+        el('div', { class: 'photo' })
+      ]));
+    }
+    frag.appendChild(el('section', { class: 'suggested' }, [
+      el('h2', { text: 'Suggested Reels' }),
+      el('div', { class: 'rail' }, [
+        el('div', { class: 'tile' }), el('div', { class: 'tile' }), el('div', { class: 'tile' })
+      ])
+    ]));
+    frag.appendChild(el('section', { class: 'suggested' }, [
+      el('h2', { text: 'Suggested for you' }),
+      el('div', { class: 'rail' }, [el('div', { class: 'tile' }), el('div', { class: 'tile' })])
+    ]));
+    return frag;
+  }
+
+  function renderReels() {
+    var video = el('video', { muted: 'muted', loop: 'loop', autoplay: 'autoplay' });
+    return el('div', { class: 'dialog', role: 'dialog' }, [
+      el('div', { text: 'Reels viewer' }),
+      video
+    ]);
+  }
+
+  function renderExplore() {
+    var grid = el('div', { class: 'grid' });
+    for (var i = 0; i < 9; i++) grid.appendChild(el('div', { class: i % 3 === 0 ? 'reel' : '' }));
+    return grid;
+  }
+
+  function renderSearch() {
+    var tabs = el('div', { class: 'tabs' }, [
+      el('span', { class: 'tab active', text: 'For you' }),
+      el('span', { class: 'tab', text: 'Accounts' })
+    ]);
+    var frag = document.createDocumentFragment();
+    frag.appendChild(tabs);
+    frag.appendChild(el('div', { role: 'tabpanel' }, [
+      el('div', { class: 'grid' }, [
+        el('div', { class: 'reel' }), el('div', {}), el('div', {}),
+        el('div', { class: 'reel' }), el('div', {}), el('div', {})
+      ])
+    ]));
+    frag.appendChild(el('div', { role: 'group' }, [
+      el('div', { class: 'acct', text: '@catsofinstagram' }),
+      el('div', { class: 'acct', text: '@catlovers' })
+    ]));
+    return frag;
+  }
+
+  function renderInbox() {
+    var frag = document.createDocumentFragment();
+    for (var i = 1; i <= 4; i++) {
+      frag.appendChild(el('div', { class: 'dmrow' }, [
+        el('div', { class: 'avatar' }),
+        el('div', {}, [
+          el('div', { text: 'friend' + i }),
+          el('div', { text: 'sent you a reel' })
+        ]),
+        el('form', {}, [
+          el('input', { placeholder: 'Message…', type: 'text' }),
+          el('button', { text: 'Send', type: 'submit' })
+        ])
+      ]));
+    }
+    return frag;
+  }
+
+  function renderProfile() {
+    var frag = document.createDocumentFragment();
+    frag.appendChild(el('div', { class: 'tabs' }, [
+      el('span', { class: 'tab active', text: 'Posts' }),
+      el('span', { class: 'tab', text: 'Reels' }),
+      el('span', { class: 'tab', text: 'Tagged' })
+    ]));
+    frag.appendChild(el('div', { class: 'grid' }, [
+      el('div', {}), el('div', {}), el('div', {})
+    ]));
+    return frag;
+  }
+
+  function renderLogin() {
+    return el('div', { class: 'acct' }, [
+      el('div', { text: 'Log in to Instagram' }),
+      el('form', {}, [
+        el('input', { placeholder: 'Username', type: 'text' }),
+        el('input', { placeholder: 'Password', type: 'password' }),
+        el('button', { text: 'Log in', type: 'submit' })
+      ])
+    ]);
+  }
+
+  function renderFor(path) {
+    if (path === '/') return renderHome();
+    if (/^\/reels/.test(path) || /^\/reel\//.test(path)) return renderReels();
+    if (/^\/explore\/search/.test(path)) return renderSearch();
+    if (/^\/explore/.test(path)) return renderExplore();
+    if (/^\/direct/.test(path)) return renderInbox();
+    if (/^\/accounts\//.test(path)) return renderLogin();
+    if (/\/reels\/?$/.test(path)) return renderReels();
+    if (/^\/[^/]+\/?$/.test(path) && path !== '/') return renderProfile();
+    return el('div', { class: 'acct', text: 'Surface for ' + path });
+  }
+
+  function render() {
+    var path = location.pathname + (location.search || '');
+
+    document.getElementById('routeLabel').textContent = path;
+    var surface = document.getElementById('surface');
+    surface.textContent = '';
+    surface.appendChild(renderFor(location.pathname));
+
+    var sidebar = document.getElementById('sidebar');
+    sidebar.textContent = '';
+    navRows(true).forEach(function (row) { sidebar.appendChild(row); });
+
+    var bottom = document.getElementById('bottomnav');
+    bottom.textContent = '';
+    navRows(false).forEach(function (row) { bottom.appendChild(row); });
+
+    updateStatus();
+  }
+
+  function goTo(href, replace) {
+    if (replace) history.replaceState({}, '', href);
+    else history.pushState({}, '', href);
+    render();
+  }
+
+  // Emulate the mobile-webkit quirk the fixture exists to catch: the page
+  // re-renders after the engine has already filtered it.
+  window.addEventListener('popstate', render);
+
+  // --- status ---------------------------------------------------------------
+
+  function updateStatus() {
+    var focus = window.IGFocus;
+    if (!focus) return;
+    var s = focus.status();
+    document.getElementById('status').textContent = JSON.stringify({
+      path: s.path,
+      surface: s.surface,
+      blocked: s.blocked,
+      reason: s.reason,
+      hiddenNodes: s.hiddenCount,
+      enforceRedirect: s.enforceRedirect,
+      redirectRequests: window.__redirectRequests.length
+    }, null, 2);
+  }
+
+  // --- controls -------------------------------------------------------------
+
+  function buildControls() {
+    var nav = document.getElementById('navButtons');
+    Object.keys(ROUTES).forEach(function (key) {
+      var route = ROUTES[key];
+      var b = el('button', { text: route.label });
+      b.addEventListener('click', function () {
+        log('click ' + route.label + ' -> ' + route.path);
+        // A real click on Instagram is a navigation-ish pushState; blocked
+        // routes are then redirected by the engine.
+        window.__lastNavKey = key;
+        goTo(route.path);
+        window.__drainRedirects();
+      });
+      nav.appendChild(b);
+    });
+
+    var reset = el('button', { class: 'primary', text: 'Reset URL to fixture' });
+    reset.addEventListener('click', function () {
+      goTo('/fixtures/instagram-mock.html', true);
+    });
+    nav.appendChild(reset);
+
+    var toggles = document.getElementById('toggles');
+    Object.keys(window.IGFocusConfig.DEFAULTS).forEach(function (key) {
+      if (typeof window.IGFocusConfig.DEFAULTS[key] !== 'boolean') return;
+      var id = 'toggle-' + key;
+      var input = el('input', { type: 'checkbox', id: id });
+      input.checked = window.IGFocus.getConfig()[key];
+      input.addEventListener('change', function () {
+        var patch = {};
+        patch[key] = input.checked;
+        window.IGFocus.setConfig(patch);
+        log('config ' + key + '=' + input.checked);
+        window.__drainRedirects();
+        updateStatus();
+      });
+      var label = el('label', { class: 'toggle', for: id }, [input, el('span', { text: key })]);
+      toggles.appendChild(label);
+    });
+  }
+
+  /**
+   * guard.js requested a redirect. The fixture plays the part of the browser:
+   * it moves to the landing path and re-renders, so what you see afterwards is
+   * what the app will actually show.
+   */
+  window.__drainRedirects = function () {
+    var requests = window.__redirectRequests.splice(0, window.__redirectRequests.length);
+    if (!requests.length) return;
+    requests.forEach(function (to) { log('redirect -> ' + to); });
+    goTo(requests[requests.length - 1], true);
+    updateStatus();
+  };
+
+  /**
+   * Self-test. Runs the engine against the fixture and asserts the invariants
+   * that matter — especially the one that is easy to get wrong and catastrophic
+   * when wrong: hiding a blocked surface must never carry over onto a surface
+   * that has to keep working.
+   *
+   * Run it from the console:  __igfocusSelfTest()
+   */
+  window.__igfocusSelfTest = function () {
+    var results = [];
+    var disp = function (sel) {
+      var node = document.querySelector(sel);
+      return node ? getComputedStyle(node).display : 'MISSING';
+    };
+    // True only when EVERY match is hidden. A plain disp() would pass while a
+    // second nav bar (the mobile bottom bar) still showed the row.
+    var allHidden = function (sel) {
+      var nodes = document.querySelectorAll(sel);
+      if (!nodes.length) return false;
+      for (var i = 0; i < nodes.length; i++) {
+        if (getComputedStyle(nodes[i]).display !== 'none') return false;
+      }
+      return true;
+    };
+    var go = function (path) {
+      history.replaceState({}, '', path);
+      render();
+      window.IGFocus.scan();
+    };
+    var check = function (name, pass, detail) {
+      results.push({ name: name, pass: !!pass, detail: detail || '' });
+    };
+
+    // Inspect each surface in place rather than being bounced to the inbox.
+    window.IGFocus.setConfig({ enforceRedirect: false });
+
+    go('/direct/inbox/');
+    check('messages: main container visible', disp('#surface') !== 'none', disp('#surface'));
+    check('messages: rows visible', disp('#surface .dmrow') !== 'none');
+    check('messages: composer visible', disp('#surface input') !== 'none');
+
+    go('/');
+    check('home: feed container hidden', disp('#surface') === 'none', disp('#surface'));
+    check('home: notice shown', disp('.igfocus-notice') !== 'none', disp('.igfocus-notice'));
+
+    go('/direct/inbox/');
+    check(
+      'messages still visible AFTER visiting the blocked feed',
+      disp('#surface') !== 'none',
+      'regression guard: route-scoped hiding must be undone (got ' + disp('#surface') + ')'
+    );
+    check('messages: notice removed', !document.querySelector('.igfocus-notice'));
+
+    go('/reels/');
+    check('reels: feed container hidden', disp('#surface') === 'none', disp('#surface'));
+
+    go('/direct/inbox/');
+    check('messages visible again after reels', disp('#surface') !== 'none', disp('#surface'));
+    check('messages: composer still visible', disp('#surface input') !== 'none');
+
+    // --- Search policy ------------------------------------------------------
+    // Search is a blocked ROUTE by default: it is the same one-tap discovery
+    // surface as the feed and Reels, so leaving it open made the app
+    // inconsistent. The toggle hands it back whole, and `blockSearchGrid` then
+    // decides how much of the handed-back page you see.
+    go('/explore/search/keyword/?q=cats');
+    check('search: blocked by default', disp('#surface') === 'none', disp('#surface'));
+    check('search: notice shown while blocked', disp('.igfocus-notice') !== 'none');
+
+    window.IGFocus.setConfig({ blockSearch: false });
+    go('/explore/search/keyword/?q=cats');
+    check('search: allowed once the toggle is off', disp('#surface') !== 'none', disp('#surface'));
+    check('search: results grid hidden', disp('#surface [role="tabpanel"]') === 'none', disp('#surface [role="tabpanel"]'));
+    check('search: accounts list visible', disp('#surface [role="group"]') !== 'none', disp('#surface [role="group"]'));
+    check('search: tabs visible', disp('#surface .tabs') !== 'none');
+
+    window.IGFocus.setConfig({ blockSearchGrid: false });
+    go('/explore/search/keyword/?q=cats');
+    check('search: grid returns when the grid toggle is off too', disp('#surface [role="tabpanel"]') !== 'none', disp('#surface [role="tabpanel"]'));
+
+    window.IGFocus.setConfig({ blockSearch: true, blockSearchGrid: true });
+    go('/explore/search/keyword/?q=cats');
+    check('search: blocked again once both toggles are restored', disp('#surface') === 'none', disp('#surface'));
+    check('search: the search nav entry is removed too', disp('a[href^="/explore/search"]') === 'none', disp('a[href^="/explore/search"]'));
+
+    go('/someuser/');
+    check('profile: main container visible', disp('#surface') !== 'none', disp('#surface'));
+
+    check('reels nav link hidden', disp('a[href="/reels/"]') === 'none', disp('a[href="/reels/"]'));
+    check('explore nav link hidden', disp('a[href="/explore/"]') === 'none', disp('a[href="/explore/"]'));
+    check('messages nav link still visible', disp('a[href="/direct/inbox/"]') !== 'none');
+
+    // The shape the real site uses: the anchor is NOT the row. Hiding only the
+    // <a> leaves an icon and a tappable row behind — the bug that reached the
+    // device. Both nav bars (sidebar and bottom bar) must lose the whole row.
+    check(
+      'reels nav ROW hidden in every nav bar, not just the anchor',
+      allHidden('[data-nav="reels"]'),
+      'rows still visible: ' +
+        document.querySelectorAll('[data-nav="reels"]:not([data-igfocus-hidden])').length
+    );
+    check('explore nav ROW hidden in every nav bar', allHidden('[data-nav="explore"]'));
+    check('search nav ROW hidden in every nav bar', allHidden('[data-nav="search"]'));
+    check('messages nav ROW still visible', disp('[data-nav="inbox"]') !== 'none');
+    check(
+      'the [role="navigation"] decoy (DM Thread list) is left alone',
+      disp('#threadpanel') !== 'none',
+      disp('#threadpanel')
+    );
+
+    // Redirect behaviour, via the seam.
+    window.IGFocus.setConfig({ enforceRedirect: true });
+    window.__redirectRequests.length = 0;
+    go('/reels/');
+    results.push({
+      name: 'blocked route requests a redirect to DMs',
+      pass: window.__redirectRequests[0] === '/direct/inbox/',
+      detail: 'got ' + JSON.stringify(window.__redirectRequests)
+    });
+
+    window.__redirectRequests.length = 0;
+    go('/direct/inbox/');
+    results.push({
+      name: 'allowed route requests no redirect',
+      pass: window.__redirectRequests.length === 0,
+      detail: 'got ' + JSON.stringify(window.__redirectRequests)
+    });
+
+    // --- Settings must be reversible ----------------------------------------
+    // Chrome is hidden forever by design, so turning a toggle off has to be
+    // able to take it back. It could not, twice over: guard.js stamped the
+    // attribute and never revisited it, and guard.css hid the anchors
+    // unconditionally, which no script can undo. Both now follow the config.
+    //
+    // No re-render here on purpose — a fresh DOM would hide the regression,
+    // because render() builds unhidden rows from scratch.
+    window.IGFocus.setConfig({ enforceRedirect: false, blockReels: false });
+    results.push({
+      name: 'reels nav link comes back when the toggle is switched off',
+      pass: disp('a[href="/reels/"]') !== 'none',
+      detail: disp('a[href="/reels/"]')
+    });
+    results.push({
+      name: 'reels nav ROW comes back too',
+      pass: !allHidden('[data-nav="reels"]'),
+      detail: 'the row is still hidden'
+    });
+    results.push({
+      name: 'the chrome attribute no longer lists reels',
+      pass: String(document.documentElement.getAttribute('data-igfocus-hide') || '').indexOf('reels') === -1,
+      detail: document.documentElement.getAttribute('data-igfocus-hide')
+    });
+
+    window.IGFocus.setConfig({ blockReels: true });
+    results.push({
+      name: 'reels nav link is hidden again',
+      pass: disp('a[href="/reels/"]') === 'none',
+      detail: disp('a[href="/reels/"]')
+    });
+    results.push({ name: 'and so is the row', pass: allHidden('[data-nav="reels"]') });
+
+    // Leave the fixture exactly as it was found.
+    window.IGFocus.setConfig({ blockReels: true, blockExplore: true, blockSearch: true, blockSearchGrid: true });
+    updateStatus();
+
+    return {
+      passed: results.filter(function (r) { return r.pass; }).length,
+      failed: results.filter(function (r) { return !r.pass; }).length,
+      results: results
+    };
+  };
+
+  /**
+   * SPA route-change test. Separate from the self-test because it has to wait
+   * for the engine to notice on its own — no `IGFocus.scan()` nudge, which is
+   * the entire point.
+   *
+   * Run it from the console:  __igfocusSpaTest()
+   */
+  window.__igfocusSpaTest = async function () {
+    var results = [];
+    var check = function (name, pass, detail) {
+      results.push({ name: name, pass: !!pass, detail: detail || '' });
+    };
+    var disp = function (sel) {
+      var node = document.querySelector(sel);
+      return node ? getComputedStyle(node).display : 'MISSING';
+    };
+    var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+    var go = function (path) {
+      history.replaceState({}, '', path);
+      render();
+      window.IGFocus.scan();
+    };
+
+    var saved = window.IGFocus.getConfig();
+    window.IGFocus.setConfig({ enforceRedirect: false });
+
+    go('/direct/inbox/');
+    check('starts on messages', disp('#surface') !== 'none', disp('#surface'));
+
+    // The heart of it: change the route with a pushState the engine cannot have
+    // patched, then do NOT call scan(). Only the observer or the URL poll can
+    // save us here.
+    window.__rawPushState({}, '', '/');
+    render();
+    await wait(400);
+    check(
+      'blocked route reached via an unpatchable pushState is still hidden',
+      disp('#surface') === 'none',
+      'without the URL poll this stays visible (got ' + disp('#surface') + ')'
+    );
+
+    window.__rawPushState({}, '', '/reels/');
+    render();
+    await wait(400);
+    check(
+      'reels reached via an unpatchable pushState is still hidden',
+      disp('#surface') === 'none',
+      'got ' + disp('#surface')
+    );
+
+    go('/direct/inbox/');
+    await wait(50);
+    check('messages come back afterwards', disp('#surface') !== 'none', disp('#surface'));
+
+    window.IGFocus.setConfig({ enforceRedirect: saved.enforceRedirect });
+
+    return {
+      passed: results.filter(function (r) { return r.pass; }).length,
+      failed: results.filter(function (r) { return !r.pass; }).length,
+      results: results
+    };
+  };
+
+  // Slow poll instead of patching history: robust and obviously correct.
+  setInterval(window.__drainRedirects, 250);
+  setInterval(updateStatus, 250);
+
+  render();
+  buildControls();
+  window.__drainRedirects();
+  log('fixture ready');
+})();
+</script>
+</body>
+</html>

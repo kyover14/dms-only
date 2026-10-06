@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bare fixture — engine-free</title>
+<!--
+  Deliberately contains NO engine.
+
+  `fixtures/instagram-mock.html` has the engine inlined, so it cannot be used to
+  test the packaged artifact: the engine would already be running before the
+  artifact was injected, and the result would prove nothing.
+
+  This page is the opposite: Instagram-shaped markup and nothing else. The
+  WebKit tests inject the REAL built userscript into it, which is the closest
+  thing to what happens on an iPhone that can be reproduced off-device.
+
+  Keep it minimal. It exists to answer one question: does the shipped file, on a
+  WebKit engine, hide the Reels and Explore entries and refuse the feed?
+-->
+<style>
+  body { margin: 0; font: 14px -apple-system, sans-serif; }
+  .navrow, .cell { display: flex; align-items: center; }
+  .chrome a { display: block; padding: 10px 14px; text-decoration: none; color: #262626; }
+  main { padding: 14px; }
+  article { padding: 10px 0; border-bottom: 1px solid #eee; }
+  .rail { height: 70px; background: #e7e9ec; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<!--
+  Nav shaped like the REAL site: NO <nav> element, and each entry is a bare
+  <a href> tucked inside a chain of <div>/<span> wrappers. The anchor is not the
+  row — hiding the anchor alone leaves the icon and a tappable row, which is the
+  bug this markup exists to catch. data-nav marks the row so the test can assert
+  the whole row went away.
+-->
+<div class="chrome">
+  <div class="navrow" data-nav="home"><span class="cell"><a href="/">Home</a></span></div>
+  <div class="navrow" data-nav="reels"><span class="cell"><a href="/reels/">Reels</a></span></div>
+  <div class="navrow" data-nav="explore"><span class="cell"><a href="/explore/">Explore</a></span></div>
+  <div class="navrow" data-nav="search"><span class="cell"><a href="/explore/search/">Search</a></span></div>
+  <div class="navrow" data-nav="inbox"><span class="cell"><a href="/direct/inbox/">Messages</a></span></div>
+  <div class="navrow" data-nav="profile"><span class="cell"><a href="/someuser/">Profile</a></span></div>
+</div>
+
+<!-- The real site's ONLY [role="navigation"] is the DM "Thread list" panel,
+     and it contains no links at all. Present so a selector leaning on it matches
+     nothing here either. -->
+<div role="navigation" aria-label="Thread list"></div>
+
+<main role="main">
+  <article>post one</article>
+  <article>post two</article>
+  <section>
+    <h2>Suggested Reels</h2>
+    <div class="rail"></div>
+  </section>
+
+  <!-- Search, shaped the way the engine expects to find it: the scrollable
+       results grid in a [role="tabpanel"], the account rows in a
+       [role="group"], and the tabs outside both. The tests use these to prove
+       that search is blocked outright by default, and that turning the toggle
+       off gives back the accounts WITHOUT giving back the endless grid. -->
+  <div class="tabs"><span>For you</span><span>Accounts</span></div>
+  <div role="tabpanel"><div class="grid">endless results</div></div>
+  <div role="group"><span>@someaccount</span></div>
+</main>
+
+</body>
+</html>
