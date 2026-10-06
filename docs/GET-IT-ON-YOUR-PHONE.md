@@ -9,6 +9,12 @@ need to have, and the one step people get stuck on.
 
 Roughly 30–45 minutes end to end, most of it waiting for downloads.
 
+> **Nothing exists to download yet.** An iOS app can only be compiled on macOS,
+> and you are on Windows, so the `.ipa` file does not exist until Part 1 puts this
+> code on GitHub — Part 2 is where it gets built, and Part 4 is where you download
+> it. Everything on this machine is already finished and tested; the missing piece
+> is that one build.
+
 ---
 
 ## Before you start
