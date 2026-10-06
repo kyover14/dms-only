@@ -271,7 +271,9 @@ No entitlements, no gated capabilities, no App Review approval — deliberately,
 the cheap install path stays open. **Do not add `FamilyControls` or any other
 restricted entitlement** without revisiting that trade-off.
 
-Full walkthrough: [`docs/INSTALL-iOS.md`](docs/INSTALL-iOS.md).
+Full walkthrough: [`docs/INSTALL-iOS.md`](docs/INSTALL-iOS.md) — and if you have
+never pushed to GitHub before, [`docs/GET-IT-ON-YOUR-PHONE.md`](docs/GET-IT-ON-YOUR-PHONE.md)
+is the same process written out click by click.
 
 ---
 

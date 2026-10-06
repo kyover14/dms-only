@@ -1,5 +1,10 @@
 # Getting it onto your iPhone
 
+> **New to this?** Read [GET-IT-ON-YOUR-PHONE.md](GET-IT-ON-YOUR-PHONE.md)
+> instead. It is this same process with every click spelled out and nothing
+> assumed — including the GitHub account you need to create first. Come back here
+> for the reference material and the troubleshooting.
+
 No Mac required. Two things do the work: **GitHub Actions** compiles the app on a
 macOS runner, and **SideStore** (or AltStore) installs and re-signs it from your
 Windows PC using a free Apple ID.
