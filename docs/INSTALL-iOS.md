@@ -11,13 +11,18 @@ and it matters.
 
 ## What you are installing
 
-An app with one job: it renders `instagram.com` in a web view with the home
-feed, Reels and Explore removed, and Messages, profiles, notifications and
-search left working.
+A real iOS app, called **Focus**, with Instagram *inside it*. You tap its icon,
+it opens on your Messages, and the home feed, Reels, Explore and Search are not
+reachable anywhere in it. Messages, profiles and notifications all work, and
+every one of those blocks is a switch in Settings.
 
 It is **not** a blocker. It is a different front door to Instagram. The real
 Instagram app stays installed — keep it, so you still get push notifications for
 messages — and a Shortcut (step 6) sends you into this app whenever you tap it.
+
+Everything except the `.ipa` file is already built and tested in this repository:
+the app's source, its filtering engine, and the tests for both. The `.ipa` itself
+needs macOS, which is why GitHub Actions compiles it — that is step 1.
 
 ---
 
@@ -41,44 +46,6 @@ Two consequences worth accepting up front:
   reply.
 
 ---
-
-## Option B — Safari on your iPhone, no build and no PC
-
-Fastest path to something working, and the one to use while tuning: the same
-engine as a **userscript** in Safari. No GitHub, no CI, no sideloading, no Apple
-ID.
-
-1. Install [Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887)
-   from the App Store — free and open source.
-2. Open the app, choose a folder for scripts, and pick somewhere in
-   **iCloud Drive / Files** so you can drop files in from any device.
-3. Run `npm run build`, then copy **`dist/userscript/instagram-focus.user.js`**
-   into that folder.
-4. **Settings → Apps → Safari → Extensions → Userscripts** → **Allow**, and set
-   it to allow on `instagram.com`.
-5. Open `instagram.com` in Safari.
-
-**Updating it:** `npm run build` → replace the `.user.js` file → reopen Safari.
-The engine reloads with the page, so no reinstall is involved.
-
-**Confirm which build you are running** — in Safari's web inspector, or by
-adding a temporary alert, read `IGFocus.status().version`. If it does not match
-`package.json`, the old file is still in place and Safari is serving a cache.
-
-Caveats specific to this route:
-
-- **Safari only.** Not the Instagram app, and **not** a Home Screen web app —
-iOS does not run extensions inside those.
-- Because a userscript manager may inject into an **isolated world**, the history
-  patch can silently do nothing. That is why route detection polls the URL as
-  well; it is what makes this path work at all.
-- Notifications still come from the real Instagram app. Keep it installed.
-
----
-
-## Option A — the standalone app
-
-The rest of this document.
 
 ## 1. Get the `.ipa`
 
@@ -264,6 +231,47 @@ To remove the upkeep entirely: join the Apple Developer Program ($99/yr) and
 distribute through **TestFlight**, which lasts a year per build. Change nothing
 else — the same unsigned artifact can be re-signed for TestFlight, and this app
 needs no entitlements or App Review approvals because it uses no gated APIs.
+
+---
+
+## Not the app: Safari, no PC, no Apple ID
+
+**This is a fallback, not the product.** It is the same filtering engine, but
+running as a **userscript inside Safari** instead of inside an app you own. Use it
+if you have no Windows PC to sideload from, or if you want to try the filtering
+before going through the install.
+
+What you lose by taking this route: there is no Focus app on your home screen, no
+toolbar button back to Messages, and every time you open Instagram you are opening
+**Safari** — which is the exact arrangement this project exists to avoid.
+
+If that is still useful:
+
+1. Install [Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887)
+   from the App Store — free and open source.
+2. Open the app, choose a folder for scripts, and pick somewhere in
+   **iCloud Drive / Files** so you can drop files in from any device.
+3. Run `npm run build`, then copy **`dist/userscript/instagram-focus.user.js`**
+   into that folder.
+4. **Settings → Apps → Safari → Extensions → Userscripts** → **Allow**, and set
+   it to allow on `instagram.com`.
+5. Open `instagram.com` in Safari.
+
+**Updating it:** `npm run build` → replace the `.user.js` file → reopen Safari.
+The engine reloads with the page, so no reinstall is involved.
+
+**Confirm which build you are running** — in Safari's web inspector, or by
+adding a temporary alert, read `IGFocus.status().version`. If it does not match
+`package.json`, the old file is still in place and Safari is serving a cache.
+
+Caveats specific to this route:
+
+- **Safari only.** Not the Instagram app, and **not** a Home Screen web app —
+iOS does not run extensions inside those.
+- Because a userscript manager may inject into an **isolated world**, the history
+  patch can silently do nothing. That is why route detection polls the URL as
+  well; it is what makes this path work at all.
+- Notifications still come from the real Instagram app. Keep it installed.
 
 ---
 
