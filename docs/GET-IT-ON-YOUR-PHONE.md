@@ -76,8 +76,8 @@ A browser window will open asking you to sign in to GitHub and authorise
 of a file that expires in a month:
 
 ```bash
-git tag v1.0.4
-git push origin v1.0.4
+git tag v1.0.5
+git push origin v1.0.5
 ```
 
 ---

@@ -183,15 +183,34 @@ jobs:
           name: InstagramFocus-unsigned-ipa
 
       # `gh` is preinstalled on runners, so this needs no third-party action.
+      #
+      # `--repo` is not optional here. This job never checks the repository out,
+      # so `gh` has no git remote to work out where it is and dies with
+      #
+      #   failed to run git: fatal: not a git repository (or any of the parent
+      #   directories): .git
+      #
+      # which reads like a network fault rather than a missing flag. Passing
+      # `--repo` is cheaper than adding a whole checkout step just to answer that
+      # lookup. tests/workflow.test.mjs fails the build if it disappears again.
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           ls -la
-          gh release create "$GITHUB_REF_NAME" InstagramFocus-unsigned.ipa \
-            --title "Instagram Focus $GITHUB_REF_NAME" \
-            --notes "Unsigned build. SideStore or AltStore re-signs it with your own Apple ID on install. See docs/INSTALL-iOS.md." || {
-              echo "release already exists; uploading the asset instead"
-              gh release upload "$GITHUB_REF_NAME" InstagramFocus-unsigned.ipa --clobber
-            }
+          # Ask whether the release exists rather than treating ANY failure of
+          # `create` as "it already exists". The first version of this step did
+          # exactly that, and reported a duplicate release when the real cause
+          # was the missing repository — which sent the search the wrong way.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release $GITHUB_REF_NAME already exists; uploading the asset instead"
+            gh release upload "$GITHUB_REF_NAME" InstagramFocus-unsigned.ipa \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" InstagramFocus-unsigned.ipa \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Instagram Focus $GITHUB_REF_NAME" \
+              --notes "Unsigned build. SideStore or AltStore re-signs it with your own Apple ID on install. See docs/INSTALL-iOS.md."
+          fi

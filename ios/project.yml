@@ -30,7 +30,7 @@ settings:
     # if the two drift. The point is not tidiness: the on-device check for
     # "did the new build actually install?" is the app's version, and that is
     # only answerable if one number means one build.
-    MARKETING_VERSION: "1.0.4"
+    MARKETING_VERSION: "1.0.5"
     CURRENT_PROJECT_VERSION: "1"
 
 targets:

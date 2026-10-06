@@ -255,7 +255,7 @@ a free Apple ID.
 ```bash
 git remote add origin https://github.com/<you>/<repo>.git
 git push -u origin main        # Actions builds the unsigned .ipa
-git tag v1.0.4 && git push origin v1.0.4   # attaches it to a permanent URL
+git tag v1.0.5 && git push origin v1.0.5   # attaches it to a permanent URL
 ```
 
 Tagging is the step worth not skipping. A workflow artefact expires and needs you

@@ -1,6 +1,6 @@
 {
   "name": "instagram-focus",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "An iOS app that loads Instagram with only messages and the useful parts — no home feed, no Reels, no Explore.",
   "scripts": {

@@ -280,3 +280,48 @@ test('xcodebuild never combines -target with -derivedDataPath', () => {
     );
   }
 });
+
+test('a job that runs gh without checking the repo out passes --repo', () => {
+  // Learned from the release job, which failed with:
+  //
+  //   failed to run git: fatal: not a git repository (or any of the parent
+  //   directories): .git
+  //
+  // `gh` infers the repository from the git remote, and that job never runs
+  // actions/checkout, so it has no remote to read. The message blames git, not
+  // the missing flag, so it is worth failing here instead.
+  //
+  // Checked per run: block rather than per command: these invocations wrap over
+  // several continuation lines, and splitting them apart to be clever would make
+  // this checker itself the most likely thing to be wrong.
+  const jobs = jobNames();
+
+  for (const [index, job] of jobs.entries()) {
+    const next = jobs[index + 1];
+    // job.line is a 0-based index into `lines`; runBlocks() reports 1-based
+    // numbers. The body starts one line after the job key, i.e. job.line + 2.
+    const bodyStart = job.line + 2;
+    const bodyEnd = next ? next.line : lines.length;
+    const body = lines.slice(job.line + 1, bodyEnd).join('\n');
+
+    if (!/\bgh \S/.test(body)) continue;
+    if (/uses: actions\/checkout@/.test(body)) continue;
+
+    const blocks = runBlocks().filter(
+      (block) => block.line >= bodyStart && block.line <= bodyEnd && /\bgh \S/.test(block.script)
+    );
+    assert.ok(
+      blocks.length > 0,
+      `job ${job.name} calls gh but has no run: block that this checker can see`
+    );
+
+    for (const block of blocks) {
+      assert.match(
+        block.script,
+        /--repo/,
+        `the run: block on line ${block.line} calls gh in job ${job.name}, which never checks ` +
+          'the repository out, and it passes no --repo; gh will die trying to infer the repo '
+      );
+    }
+  }
+});
