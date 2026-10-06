@@ -254,3 +254,29 @@ test('every step does one thing, and every action is pinned to a version', () =>
     }
   }
 });
+
+test('xcodebuild never combines -target with -derivedDataPath', () => {
+  // Learned the hard way, from the first run that ever reached the macOS runner:
+  //
+  //   xcodebuild: error: The flag -scheme, -testProductsPath, or -xctestrun
+  //   is required when specifying -derivedDataPath.
+  //
+  // It exits 64 before compiling a single file, so on a project that has never
+  // been compiled it reads exactly like broken Swift. `-target` is worth keeping
+  // — it needs no shared scheme to exist — and the lost flag was never doing the
+  // work anyway: CONFIGURATION_BUILD_DIR is what pins where the .app lands.
+  const invocations = runBlocks().filter((block) => block.script.includes('xcodebuild'));
+  assert.ok(invocations.length > 0, 'expected at least one xcodebuild invocation');
+
+  for (const block of invocations) {
+    const hasTarget = /(^|\s)-target\s/.test(block.script);
+    const hasDerivedData = /(^|\s)-derivedDataPath\s/.test(block.script);
+
+    assert.equal(
+      hasTarget && hasDerivedData,
+      false,
+      `the xcodebuild call in the run: block on line ${block.line} passes both -target and ` +
+        '-derivedDataPath; Xcode rejects that pair and exits 64 before compiling anything'
+    );
+  }
+});

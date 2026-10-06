@@ -77,8 +77,8 @@ commands below do the rest.
    between the two ways of collecting the build:
 
    ```bash
-   git tag v1.0.3
-   git push origin v1.0.3
+   git tag v1.0.4
+   git push origin v1.0.4
    ```
 
    The `release` job then attaches the `.ipa` to a GitHub Release. Its URL looks

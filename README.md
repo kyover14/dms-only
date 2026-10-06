@@ -255,7 +255,7 @@ a free Apple ID.
 ```bash
 git remote add origin https://github.com/<you>/<repo>.git
 git push -u origin main        # Actions builds the unsigned .ipa
-git tag v1.0.3 && git push origin v1.0.3   # attaches it to a permanent URL
+git tag v1.0.4 && git push origin v1.0.4   # attaches it to a permanent URL
 ```
 
 Tagging is the step worth not skipping. A workflow artefact expires and needs you
@@ -345,8 +345,8 @@ not the app's `WKWebView`. Treat it as "unlikely to be engine-specific", not as
   which is why the workflow now lints itself before the macOS runner is ever
   billed for it.
 - **Anything on an actual iPhone.** No device access here, and no iOS Simulator
-  without macOS. The last on-device run was 1.0.1; 1.0.2 and 1.0.3 have not been
-  installed on a phone yet.
+  without macOS. The last on-device run was 1.0.1, and nothing built since has
+  been installed on a phone.
 - Instagram sign-in inside a `WKWebView`. Mitigated (Safari user agent,
   persistent data store, password login) but unproven until tried on a device.
 - SideStore refresh behaviour on current iOS.

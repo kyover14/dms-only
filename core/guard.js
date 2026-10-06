@@ -29,7 +29,7 @@
 
   // Kept in step with package.json by scripts/build.mjs, which fails the build
   // if the two drift — a version you cannot trust is worse than none.
-  var VERSION = '1.0.3';
+  var VERSION = '1.0.4';
   var isMainFrame = root.top === root;
 
   // ---------------------------------------------------------------------------

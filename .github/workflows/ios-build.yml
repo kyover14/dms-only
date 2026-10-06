@@ -97,25 +97,42 @@ jobs:
 
       # `-target` rather than `-scheme`: it needs no shared scheme to exist, and
       # there are no tests to run in this target.
+      #
+      # Do NOT add `-derivedDataPath` back to the invocation below. Xcode refuses
+      # the flag outright when no `-scheme` is given:
+      #
+      #   xcodebuild: error: The flag -scheme, -testProductsPath, or -xctestrun
+      #   is required when specifying -derivedDataPath.
+      #
+      # It exits 64 in a fraction of a second, so it reads like a broken project
+      # rather than a bad flag — which is exactly how it was misdiagnosed once.
+      # `CONFIGURATION_BUILD_DIR` is what actually pins the .app's location, so
+      # DerivedData can go wherever Xcode likes and the packaging step searches
+      # both that path and the DerivedData fallback. tests/workflow.test.mjs
+      # fails the build if this flag and `-target` ever appear together again.
       - name: Build unsigned app
         run: |
           # -o pipefail matters: without it the `tail` below would swallow a
           # build failure, the step would report success, and the packaging step
           # would fail afterwards with a confusing "no .app produced" message.
+          #
+          # The tail is wide on purpose: the first real compile of this app is
+          # expected to be where Swift errors surface, and a 60-line window can
+          # cut the first error off the top — costing a whole CI round trip to
+          # re-read what the log already had.
           set -o pipefail
           xcodebuild build \
             -project ios/InstagramFocus.xcodeproj \
             -target InstagramFocus \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath build/DerivedData \
             CONFIGURATION_BUILD_DIR="$PWD/build/Products" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             EXPANDED_CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            ONLY_ACTIVE_ARCH=NO 2>&1 | tail -60
+            ONLY_ACTIVE_ARCH=NO 2>&1 | tail -120
 
       - name: Package unsigned .ipa
         run: |
