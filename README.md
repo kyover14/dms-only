@@ -87,8 +87,10 @@ docs/INSTALL-iOS.md      install walkthrough, on-device checklist, troubleshooti
 ## Quick start
 
 ```bash
-npm test              # everything below; ~4s, no network
+npm test              # everything below; ~15s, no network
 npm run test:webkit   # just the WebKit tests
+IGFOCUS_LIVE=1 npm test   # also loads the built extension into a real browser
+                          # against real instagram.com — needs the network
 npm run build         # userscript, browser extensions, fixture, iOS resources
 npm run serve         # http://127.0.0.1:8123/ — the offline fixture
 ```
@@ -309,6 +311,17 @@ Full walkthrough: [`docs/INSTALL-iOS.md`](docs/INSTALL-iOS.md).
 - **The CI workflow itself**: no tabs or ragged indentation, every block scalar
   correctly nested, `bash -n` clean over every `run:` line, every job with a
   runner and steps, every `needs:` naming a real job, every action version-pinned
+- **5 live tests** against real `instagram.com`, in a real browser with the
+  built extension loaded (opt-in: `IGFOCUS_LIVE=1`). These are the only tests that
+  can contradict what the fixtures assume:
+  - the extension loads and runs on Instagram's own markup
+  - `/` and `/reels/` are redirected, visible in the navigation chain as an extra
+    hop to `/direct/inbox/` that only happens with the extension installed
+  - the injected stylesheet applies on the real origin, and is scoped — a
+    synthetic Messages link beside a synthetic Reels link stays visible
+  - **the search route is rewritten to Messages on the real site, and is *not*
+    rewritten once the toggle is off** — both directions, on a real document
+  - a stored setting is read and honoured
 - Build integrity: every core file is inlined into the fixture byte-for-byte
 - **On iOS Safari the engine loads, classifies and redirects correctly**
   (confirmed on a device, 1.0.1). Check yours with `IGFocus.status().version`.
